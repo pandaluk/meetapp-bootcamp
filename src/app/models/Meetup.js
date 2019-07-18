@@ -7,7 +7,7 @@ class Meetup extends Model {
         title: Sequelize.STRING,
         description: Sequelize.STRING,
         location: Sequelize.STRING,
-        event_date: Sequelize.DATE,
+        date: Sequelize.DATE,
       },
       {
         sequelize,
@@ -19,6 +19,7 @@ class Meetup extends Model {
 
   static associate(models) {
     this.belongsTo(models.User, { foreignKey: 'user_id' });
+    this.belongsTo(models.File, { foreignKey: 'file_id' });
   }
 }
 
