@@ -1,5 +1,5 @@
 import * as Yup from 'yup';
-import { startOfHour, isBefore } from 'date-fns';
+import { isBefore } from 'date-fns';
 import Meetup from '../models/Meetup';
 import File from '../models/File';
 
@@ -7,6 +7,7 @@ class MeetupController {
   async store(req, res) {
     const schema = Yup.object().shape({
       title: Yup.string().required(),
+      file_id: Yup.number().required(),
       description: Yup.string().required(),
       location: Yup.string().required(),
       date: Yup.date().required(),
@@ -16,33 +17,42 @@ class MeetupController {
       return res.status(400).json({ error: 'Validation fails' });
     }
 
-    const { title, description, location, date, file_id } = req.body;
-
     /**
      * Check for past dates
      */
-    const hourStart = startOfHour(date);
 
-    if (isBefore(hourStart, new Date())) {
-      return res.status(400).json({ error: 'Date of event invalid' });
+    if (isBefore(req.body.date, new Date())) {
+      return res.status(400).json({ error: 'Meetup date invalid' });
     }
 
     /**
      * Create the meetup
      */
+    const user_id = req.userId;
+
     const meetup = await Meetup.create({
-      user_id: req.userId,
-      title,
-      description,
-      location,
-      date,
-      file_id,
+      ...req.body,
+      user_id,
     });
 
     return res.json(meetup);
   }
 
   async update(req, res) {
+    const schema = Yup.object().shape({
+      title: Yup.string(),
+      file_id: Yup.number(),
+      description: Yup.string(),
+      location: Yup.string(),
+      date: Yup.date(),
+    });
+
+    if (!(await schema.isValid(req.body))) {
+      return res.status(400).json({ error: 'Validation fails' });
+    }
+
+    const user_id = req.userId;
+
     const meetup = await Meetup.findByPk(req.params.id);
 
     /**
@@ -55,9 +65,8 @@ class MeetupController {
     /**
      * Verify if the user is the owner of the meetup
      */
-    const { userId } = req;
 
-    if (meetup.user_id !== userId) {
+    if (meetup.user_id !== user_id) {
       return res
         .status(401)
         .json({ error: "You're not the creator of the meetup." });
@@ -67,14 +76,13 @@ class MeetupController {
      * Verify if the date still is valid
      */
 
-    if (isBefore(meetup.date, new Date())) {
+    if (meetup.past) {
       return res.status(400).json({
         error: 'You can not change a meetup that has passed the date',
       });
     }
 
-    const { date } = req.body;
-    if (isBefore(date, new Date())) {
+    if (isBefore(req.body.date, new Date())) {
       return res
         .status(400)
         .json({ error: 'The new date of the Meetup already pass' });
@@ -83,11 +91,9 @@ class MeetupController {
     /**
      * update meetup
      */
-    const { id, title, description, location, file_id } = await meetup.update(
-      req.body
-    );
+    await meetup.update(req.body);
 
-    return res.json({ id, title, description, location, file_id, userId });
+    return res.json(meetup);
   }
 
   async index(req, res) {
@@ -121,9 +127,9 @@ class MeetupController {
     /**
      * Verify if the user is the owner of the meetup
      */
-    const { userId } = req;
+    const user_id = req.userId;
 
-    if (meetup.user_id !== userId) {
+    if (meetup.user_id !== user_id) {
       return res
         .status(401)
         .json({ error: "You're not the creator of the meetup." });
@@ -133,7 +139,7 @@ class MeetupController {
      *Verify if the meetup date already pass
      */
 
-    if (isBefore(meetup.date, new Date())) {
+    if (meetup.past) {
       return res
         .status(400)
         .json({ error: 'The new date of the Meetup already pass' });
