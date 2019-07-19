@@ -107,6 +107,42 @@ class MeetupController {
 
     res.json(meetups);
   }
+
+  async delete(req, res) {
+    const meetup = await Meetup.findByPk(req.params.id);
+
+    /**
+     * Verify if the meetup exits
+     */
+    if (!meetup) {
+      return res.status(400).json({ error: 'Meetup not found' });
+    }
+
+    /**
+     * Verify if the user is the owner of the meetup
+     */
+    const { userId } = req;
+
+    if (meetup.user_id !== userId) {
+      return res
+        .status(401)
+        .json({ error: "You're not the creator of the meetup." });
+    }
+
+    /**
+     *Verify if the meetup date already pass
+     */
+
+    if (isBefore(meetup.date, new Date())) {
+      return res
+        .status(400)
+        .json({ error: 'The new date of the Meetup already pass' });
+    }
+
+    await meetup.destroy();
+
+    return res.json({ ok: 'ok' });
+  }
 }
 
 export default new MeetupController();
